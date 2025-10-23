@@ -1,3 +1,4 @@
+import pytz
 import requests
 import streamlit as st
 from datetime import datetime
@@ -38,7 +39,7 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
                 cards_new = []
 
             # Fetch calls for today
-            today = datetime.now().strftime("%Y-%m-%d")
+            today = datetime.now(pytz.timezone("Europe/Kyiv")).strftime("%Y-%m-%d")
             calls_today = api_client.fetch_all_calls(max_calls=400, date=today, include="")
             lead_ids = [call.get('lead_id') for call in calls_today if call.get('lead_id') is not None]
 
