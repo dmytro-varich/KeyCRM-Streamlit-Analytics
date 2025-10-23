@@ -39,9 +39,7 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
 
             # Fetch calls for today
             today = datetime.now().strftime("%Y-%m-%d")
-            today = '2025-10-23'
             calls_today = api_client.fetch_all_calls(max_calls=400, date=today, include="")
-            # st.json(calls_today)
             lead_ids = [call.get('lead_id') for call in calls_today if call.get('lead_id') is not None]
 
             # Normalize lead IDs: keep only values convertible to int
@@ -96,4 +94,5 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
 
             st.success(f"✅ Received {len(all_cards)} cards (new + by calls)")
         except Exception as e:
+
             st.error(f"❌ Error processing data: {e}")
