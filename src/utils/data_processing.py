@@ -92,7 +92,7 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
                 'count': len(all_cards)
             }
 
-            st.success(f"✅ Received {len(all_cards)} cards (new + by calls)")
+            st.success(f"✅ Received {len(all_cards)} cards")
         except Exception as e:
 
             st.error(f"❌ Error processing data: {e}")
