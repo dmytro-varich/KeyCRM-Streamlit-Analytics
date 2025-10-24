@@ -5,6 +5,16 @@ from datetime import datetime
 from config.settings import WEBHOOK_PROD_URL
 from src.utils.analytics import build_manager_category_dict
 
+kyiv_tz = pytz.timezone("Europe/Kyiv")
+today = datetime.now(kyiv_tz).strftime("%Y-%m-%d")
+
+def get_kyiv_date(created_at_str):
+    try:
+        dt_utc = datetime.strptime(created_at_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=pytz.utc)
+        dt_kyiv = dt_utc.astimezone(kyiv_tz)
+        return dt_kyiv.strftime("%Y-%m-%d")
+    except Exception:
+        return ""
 
 def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
     """
@@ -39,7 +49,6 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
                 cards_new = []
 
             # Fetch calls for today
-            today = datetime.now(pytz.timezone("Europe/Kyiv")).strftime("%Y-%m-%d")
             calls_today = api_client.fetch_all_calls(max_calls=400, date=today, include="")
             lead_ids = [call.get('lead_id') for call in calls_today if call.get('lead_id') is not None]
 
@@ -65,11 +74,11 @@ def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
                     cards_by_leads = response_leads.get('data', [])
 
             # "Нові": cards created today (from webhook and calls)
-            cards_calls_new = [card for card in cards_by_leads if card.get('created_at', '')[:10] == today and card.get('manager_id', False)]
+            cards_calls_new = [card for card in cards_by_leads if get_kyiv_date(card.get('created_at', '')) == today and card.get('manager_id', False)]
             cards_new_final = cards_new + cards_calls_new
 
             # "Попередні": cards with a call today, but not created today
-            cards_calls_final = [card for card in cards_by_leads if card.get('created_at', '')[:10] != today and card.get('manager_id', False)]
+            cards_calls_final = [card for card in cards_by_leads if get_kyiv_date(card.get('created_at', '')) != today and card.get('manager_id', False)]
 
             # Remove duplicates (if any)
             new_ids = {card.get('id') for card in cards_new_final}

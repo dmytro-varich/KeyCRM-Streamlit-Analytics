@@ -33,10 +33,12 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
         "Закр. Зустріч ONLINE"
     ]
     not_qualified_status_ids = {341, 386, 396, 435}
+    hot_status_ids = {344, 437, 398}
 
     for state, card_list in cards.items():
         for card in card_list:
             manager = card.get('manager', {})
+            status_id = card.get('status_id')
             manager_key = f"{manager.get('first_name', 'N/A')} {manager.get('last_name', 'N/A')}"
             pipeline_id = card.get('pipeline_id')
             if not isinstance(pipeline_id, int):
@@ -57,7 +59,7 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
                     kvalifikovanyi = field.get('value', False)
                 if field.get('name') in custom_keys:
                     custom_values[field.get('name')] = field.get('value', False)
-            prog = "Прогріті" if hot_contact else "Не прогріті"
+            prog = "Прогріті" if hot_contact or status_id in hot_status_ids else "Не прогріті"
 
             # Initialize structure for manager/category if not exists
             if manager_key not in result:
@@ -79,7 +81,6 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
                     result[manager_key][profession_priority][key] += 1
 
             # Logic for "Не квалифіковані"
-            status_id = card.get('status_id')
             if not kvalifikovanyi or (status_id in not_qualified_status_ids):
                 result[manager_key][profession_priority]["Не квалифіковані"] += 1
 
