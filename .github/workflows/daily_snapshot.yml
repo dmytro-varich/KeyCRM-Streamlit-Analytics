@@ -24,7 +24,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: "🔐 Save API key"
-        run: echo "${{ secrets.KEYCRM_API_KEY }}" > .env
+        run: echo "KEYCRM_API_KEY=${{ secrets.KEYCRM_API_KEY }}" > .env
 
       - name: "🏃 Run daily_snapshot.py"
         working-directory: src
