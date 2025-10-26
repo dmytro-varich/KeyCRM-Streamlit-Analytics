@@ -17,16 +17,16 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
         html = """
         <table style='border-collapse:collapse;width:100%;text-align:center;'>
         <tr style='font-weight:bold;'>
-            <th rowspan='2'>Category</th>
-            <th colspan='2'>New</th>
-            <th colspan='2'>Previous</th>
-            <th rowspan='2'>Not qualified</th>
-            <th colspan='4'>Closed from them:</th>
+            <th rowspan='2'>Категорія</th>
+            <th colspan='2'>Нові</th>
+            <th colspan='2'>Попередні</th>
+            <th rowspan='2'>Не кваліфіковані</th>
+            <th colspan='4'>З них закрито:</th>
         </tr>
         <tr style='font-weight:bold;'>
-            <th>Warmed up</th><th>Not warmed up</th>
-            <th>Warmed up</th><th>Not warmed up</th>
-            <th>Referral</th><th>Meeting</th><th>Training</th><th>Planning</th>
+            <th>Прогріті</th><th>Не прогріті</th>
+            <th>Прогріті</th><th>Не прогріті</th>
+            <th>Рефералка</th><th>Зустріч</th><th>Навчання</th><th>Планування</th>
         </tr>
         """
 
@@ -57,7 +57,7 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
 
         # totals row
         html += "<tr style='font-weight:bold;'>"
-        html += "<td>Total</td>"
+        html += "<td>Всього</td>"
         html += f"<td>{total['Нові']['Прогріті']}</td>"
         html += f"<td>{total['Нові']['Не прогріті']}</td>"
         html += f"<td>{total['Попередні']['Прогріті']}</td>"
@@ -83,18 +83,18 @@ def create_simple_dataframe(cards: Dict[str, List[Dict[str, Any]]]) -> pd.DataFr
             created = (card.get("created_at") or "")[:10]
             updated = (card.get("updated_at") or "")[:10]
             row = {
-                "Type": state,
+                "Тип": state,
                 "ID": card.get("id"),
-                "Title": card.get("title"),
-                "Pipeline": card.get("pipeline_id"),
-                "Manager": card.get("manager", {}).get("full_name", "N/A"),
-                "Warmed up (ready to work)": get_custom_field(card, "ПРОГРІТИЙ (готовий працювати)"),
-                "Closed. Meeting KYIV": get_custom_field(card, "Закр. Зустріч КИЇВ"),
-                "Closed. Meeting ONLINE": get_custom_field(card, "Закр. Зустріч ONLINE"),
-                "Closed. Training RECORDED": get_custom_field(card, "Закр. Навчання В ЗАПИСІ"),
-                "Fully qualified": get_custom_field(card, "Кваліфікований повністю"),
-                "Created": created,
-                "Updated": updated,
+                "Назва": card.get("title"),
+                "Воронка": card.get("pipeline_id"),
+                "Менеджер": card.get("manager", {}).get("full_name", "N/A"),
+                "Прогрітий (готовий працювати)": get_custom_field(card, "ПРОГРІТИЙ (готовий працювати)"),
+                "Закр. Зустріч КИЇВ": get_custom_field(card, "Закр. Зустріч КИЇВ"),
+                "Закр. Зустріч ONLINE": get_custom_field(card, "Закр. Зустріч ONLINE"),
+                "Закр. Навчання В ЗАПИСІ": get_custom_field(card, "Закр. Навчання В ЗАПИСІ"),
+                "Кваліфікований повністю": get_custom_field(card, "Кваліфікований повністю"),
+                "Створено": created,
+                "Оновлено": updated,
             }
             rows.append(row)
 
