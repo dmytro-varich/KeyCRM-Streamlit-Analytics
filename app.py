@@ -52,6 +52,22 @@ def main() -> None:
     with st.expander("📘 Як працює класифікація аналітики?"):
         st.markdown(how_to_work_text)
 
+    st.sidebar.header("⚙️ Налаштування")
+    if st.sidebar.button("💾 Оновити вручну стан карток"):
+        cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
+        cards = cards or []
+        cards = [card for card in cards if not card.get("is_finished", False)]
+        
+        snapshot_data = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "date": str(today_date),
+            "cards": cards, 
+            "count": len(cards)
+        }
+
+        collection.insert_one(snapshot_data)
+
+
     # Load latest snapshot from MongoDB
     snapshot = collection.find_one(sort=[("date", -1)])
     if snapshot:
