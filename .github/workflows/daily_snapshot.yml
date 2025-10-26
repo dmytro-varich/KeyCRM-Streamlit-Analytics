@@ -27,4 +27,4 @@ jobs:
         run: echo "${{ secrets.KEYCRM_API_KEY }}" > .env
 
       - name: "🏃 Run daily_snapshot.py"
-        run: python src/scripts/daily_snapshot.py
+        run: PYTHONPATH=src python src/scripts/daily_snapshot.py

@@ -1,12 +1,11 @@
 import os
 import json
-from datetime import datetime, timezone
 from src.api.client import ApiClient
+from datetime import datetime, timezone
 from config.settings import SNAPSHOT_DIR
 from src.utils.time_utils import today_date
 
 SNAPSHOT_FILE = os.path.join(SNAPSHOT_DIR, f"base_snapshot_{today_date}.json")
-
 
 def main():
     api = ApiClient()
