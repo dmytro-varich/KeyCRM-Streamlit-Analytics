@@ -20,7 +20,7 @@ def main():
         "cards": cards
     }
 
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
     with open(SNAPSHOT_FILE, "w", encoding="utf-8") as f:
         json.dump(snapshot_data, f, ensure_ascii=False, indent=2)
 
