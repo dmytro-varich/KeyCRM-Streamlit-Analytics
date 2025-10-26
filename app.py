@@ -14,7 +14,7 @@ sys.path.insert(0, str(root_path))
 # Project-specific imports
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI 
-from src.utils.time_utils import today_date, SERVER_TZ
+from src.utils.time_utils import today_date, KYIV_TZ
 from src.utils.file_utils import load_json_file
 from src.utils.data_processing import process_all_data
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
@@ -60,10 +60,12 @@ def main() -> None:
                 cards = cards or []
                 cards = [card for card in cards if not card.get("is_finished", False)]
                 
+                now_kyiv = datetime.now(KYIV_TZ)
                 snapshot_data = {
-                    "timestamp": datetime.now(SERVER_TZ).isoformat(),
-                    "date": str(today_date),
-                    "cards": cards, 
+                    "timestamp": now_kyiv.isoformat(),           # Human-readable Kyiv time
+                    "date": str(today_date),                     # Date as string (Kyiv)
+                    "createdAt": now_kyiv,                       # For MongoDB TTL index (must be datetime object)
+                    "cards": cards,
                     "count": len(cards)
                 }
 
@@ -74,7 +76,7 @@ def main() -> None:
 
 
     # Load latest snapshot from MongoDB
-    snapshot = collection.find_one(sort=[("date", -1)])
+    snapshot = collection.find_one(sort=[("createdAt", -1)])
     if snapshot:
         base_cards = snapshot.get("cards", [])
         last_updated = snapshot.get("timestamp")

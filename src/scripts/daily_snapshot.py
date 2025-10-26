@@ -6,7 +6,7 @@ import json
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI
 from datetime import datetime
-from src.utils.time_utils import today_date, SERVER_TZ
+from src.utils.time_utils import today_date, KYIV_TZ
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
 
 def main():
@@ -17,10 +17,12 @@ def main():
     cards = cards or []
     cards = [card for card in cards if not card.get("is_finished", False)]
     
+    now_kyiv = datetime.now(KYIV_TZ)
     snapshot_data = {
-        "timestamp": datetime.now(SERVER_TZ).isoformat(),
-        "date": str(today_date),
-        "cards": cards, 
+        "timestamp": now_kyiv.isoformat(),           # Human-readable Kyiv time
+        "date": str(today_date),                     # Date as string (Kyiv)
+        "createdAt": now_kyiv,                       # For MongoDB TTL index (must be datetime object)
+        "cards": cards,
         "count": len(cards)
     }
 
