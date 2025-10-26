@@ -23,10 +23,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: "🔐 Save API key"
-        run: echo "KEYCRM_API_KEY=${{ secrets.KEYCRM_API_KEY }}" > .env
-
+      - name: "🔐 Save API keys"
+        run: |
+          echo "KEYCRM_API_KEY=${{ secrets.KEYCRM_API_KEY }}" > .env
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+          
       - name: "🏃 Run daily_snapshot.py"
         working-directory: src
         run: python scripts/daily_snapshot.py
+        
 

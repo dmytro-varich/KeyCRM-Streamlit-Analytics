@@ -13,9 +13,11 @@ sys.path.insert(0, str(root_path))
 
 # Project-specific imports
 from src.api.client import ApiClient
-from src.utils.file_utils import load_json_file
+from config.settings import MONGODB_URI 
 from src.utils.time_utils import today_date
+from src.utils.file_utils import load_json_file
 from src.utils.data_processing import process_all_data
+from src.utils.db_utils import init_mongo_client, get_database, get_collection
 from src.components.tables import render_manager_tables, create_simple_dataframe
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
 
@@ -27,6 +29,11 @@ def main() -> None:
     """
     api_client = ApiClient()
     pipeline_ids = list(range(1, 18))  # List of pipeline IDs to fetch
+
+    # Initialize MongoDB client and get collection
+    client = init_mongo_client(MONGODB_URI)
+    db = get_database(client, "snapshots_db")
+    collection = get_collection(db, "snapshots")
 
     # Streamlit page configuration
     st.set_page_config(
@@ -45,23 +52,20 @@ def main() -> None:
     with st.expander("📘 Як працює класифікація аналітики?"):
         st.markdown(how_to_work_text)
 
-    # Try to load daily snapshot data
-    try:
-        snapshot_data = load_json_file(f"snapshots/daily_snapshot_{today_date}.json")
-        base_cards = snapshot_data.get("cards", [])
-        last_updated = snapshot_data.get("timestamp")
-
+    # Load latest snapshot from MongoDB
+    snapshot = collection.find_one(sort=[("date", -1)])
+    if snapshot:
+        base_cards = snapshot.get("cards", [])
+        last_updated = snapshot.get("timestamp")
         if last_updated:
             dt = datetime.fromisoformat(last_updated)
             formatted = dt.strftime("%d.%m.%Y о %H:%M")
             st.info(f"⏰ Базовий стан карток оновлено {formatted}")
         else:
             st.warning("⚠️ У знімку відсутнє поле часу оновлення.")
-    except FileNotFoundError:
+    else:
         st.warning("⚠️ Сьогоднішній знімок ще не створено.")
         base_cards = []
-    except Exception as e:
-        st.error(f"🚫 Помилка при завантаженні знімка: {e}")
 
     # Button to trigger analytics generation
     if st.button("🔎 Переглянути аналітику", type="primary"):
