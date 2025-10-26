@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from config.settings import SNAPSHOT_DIR
 from src.utils.time_utils import today_date
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 SNAPSHOT_FILE = os.path.join(SNAPSHOT_DIR, f"base_snapshot_{today_date}.json")
 
 def main():
