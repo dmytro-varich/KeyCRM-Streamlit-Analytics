@@ -30,7 +30,7 @@ def get_custom_field(card, field_name, default=False):
             value = field.get("value", default)
             # Если значение — список (например, select)
             if isinstance(value, list):
-                return value[0] if value else default
+                return bool(value[0]) if value else default
             return value
     return default
 
