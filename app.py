@@ -52,28 +52,6 @@ def main() -> None:
     with st.expander("📘 Як працює класифікація аналітики?"):
         st.markdown(how_to_work_text)
 
-    st.sidebar.header("⚙️ Налаштування")
-    if st.sidebar.button("💾 Оновити вручну стан карток у воронках", type="primary"):
-        try:
-            with st.spinner("Оновлення та збереження карток у базі..."):
-                cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
-                cards = cards or []
-                cards = [card for card in cards if not card.get("is_finished", False)]
-                
-                now_kyiv = datetime.now(KYIV_TZ)
-                snapshot_data = {
-                    "timestamp": now_kyiv.isoformat(),           # Human-readable Kyiv time
-                    "date": str(today_date),                     # Date as string (Kyiv)
-                    "createdAt": now_kyiv,                       # For MongoDB TTL index (must be datetime object)
-                    "cards": cards,
-                    "count": len(cards)
-                }
-
-                collection.insert_one(snapshot_data)
-            st.success("✅ Стан карток успішно оновлено та збережено в базі!")
-        except Exception as e:
-            st.error(f"🚫 Помилка при оновленні та збереженні карток: {e}")
-
 
     # Load latest snapshot from MongoDB
     snapshot = collection.find_one(sort=[("createdAt", -1)])
@@ -138,6 +116,29 @@ def main() -> None:
     # Show results only if analytics data is available and not loading
     elif "all_data" in st.session_state and st.session_state["all_data"]:
         display_results()
+
+    st.sidebar.header("⚙️ Налаштування")
+    if st.sidebar.button("💾 Оновити вручну стан карток у воронках", type="primary"):
+        try:
+            with st.spinner("Оновлення та збереження карток у базі..."):
+                cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
+                cards = cards or []
+                cards = [card for card in cards if not card.get("is_finished", False)]
+                
+                now_kyiv = datetime.now(KYIV_TZ)
+                snapshot_data = {
+                    "timestamp": now_kyiv.isoformat(),           # Human-readable Kyiv time
+                    "date": str(today_date),                     # Date as string (Kyiv)
+                    "createdAt": now_kyiv,                       # For MongoDB TTL index (must be datetime object)
+                    "cards": cards,
+                    "count": len(cards)
+                }
+
+                collection.insert_one(snapshot_data)
+            st.success("✅ Стан карток успішно оновлено та збережено в базі!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"🚫 Помилка при оновленні та збереженні карток: {e}")
 
 
 def display_results() -> None:
