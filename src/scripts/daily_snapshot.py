@@ -5,8 +5,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import json
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI
-from datetime import datetime, timezone
-from src.utils.time_utils import today_date
+from datetime import datetime
+from src.utils.time_utils import today_date, SERVER_TZ
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
 
 def main():
@@ -18,7 +18,7 @@ def main():
     cards = [card for card in cards if not card.get("is_finished", False)]
     
     snapshot_data = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(SERVER_TZ).isoformat(),
         "date": str(today_date),
         "cards": cards, 
         "count": len(cards)

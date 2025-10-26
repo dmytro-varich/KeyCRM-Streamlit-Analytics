@@ -14,7 +14,7 @@ sys.path.insert(0, str(root_path))
 # Project-specific imports
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI 
-from src.utils.time_utils import today_date
+from src.utils.time_utils import today_date, SERVER_TZ
 from src.utils.file_utils import load_json_file
 from src.utils.data_processing import process_all_data
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
@@ -53,19 +53,24 @@ def main() -> None:
         st.markdown(how_to_work_text)
 
     st.sidebar.header("⚙️ Налаштування")
-    if st.sidebar.button("💾 Оновити вручну стан карток"):
-        cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
-        cards = cards or []
-        cards = [card for card in cards if not card.get("is_finished", False)]
-        
-        snapshot_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "date": str(today_date),
-            "cards": cards, 
-            "count": len(cards)
-        }
+    if st.sidebar.button("💾 Оновити вручну стан карток у воронках", type="primary"):
+        try:
+            with st.spinner("Оновлення та збереження карток у базі..."):
+                cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
+                cards = cards or []
+                cards = [card for card in cards if not card.get("is_finished", False)]
+                
+                snapshot_data = {
+                    "timestamp": datetime.now(SERVER_TZ).isoformat(),
+                    "date": str(today_date),
+                    "cards": cards, 
+                    "count": len(cards)
+                }
 
-        collection.insert_one(snapshot_data)
+                collection.insert_one(snapshot_data)
+            st.success("✅ Стан карток успішно оновлено та збережено в базі!")
+        except Exception as e:
+            st.error(f"🚫 Помилка при оновленні та збереженні карток: {e}")
 
 
     # Load latest snapshot from MongoDB
