@@ -1,0 +1,30 @@
+name: Daily card snapshot
+
+on:
+  schedule:
+  - cron: '0 4 * * *'  # every day at 4:00 UTC (6:00 Kyiv time)
+  workflow_dispatch:     # allows manual run from GitHub
+
+jobs:
+  run-snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "🔽 Checkout code"
+        uses: actions/checkout@v3
+
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: "📦 Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "🔐 Save API key"
+        run: echo "${{ secrets.KEYCRM_API_KEY }}" > .env
+
+      - name: "🏃 Run daily_snapshot.py"
+        run: python src/scripts/daily_snapshot.py

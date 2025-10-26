@@ -1,5 +1,6 @@
 
 import requests
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 from config.settings import API_BASE_URL, KEYCRM_API_KEY, TIMEOUT, API_CARDS_ENDPOINT
 
@@ -20,6 +21,47 @@ class ApiClient:
             "Content-Type": "application/json"
         }
 
+    def fetch_cards(self,
+        limit: int = 15,
+        page: int = 1,
+        include: str = "",
+        filters: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Fetch cards for given pipeline IDs.
+        Args:
+            pipeline_ids (List[int]): List of pipeline IDs to fetch cards from.
+            include (str, optional): Include string for related fields (e.g. 'contact.client,products').
+        Returns:
+            dict: API response with card data.
+        """
+        url: str = f"{self.base_url}{API_CARDS_ENDPOINT}"
+        params: Dict[str, Any] = {
+            "limit": limit,
+            "page": page
+        }
+        if include:
+            params["include"] = include
+        if filters:
+            for key, value in filters.items():
+                params[f"filter[{key}]"] = value
+
+        try:
+            response = requests.get(
+                url,
+                headers=self.headers,
+                params=params,
+                timeout=TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return {
+                "error": True,
+                "message": f"Error fetching calls: {str(e)}",
+                "data": []
+            }
+            
     def fetch_cards_by_ids(self, card_ids: List[int], include: Optional[str] = None) -> Dict[str, Any]:
         """
         Fetch cards by a list of IDs.
@@ -106,6 +148,7 @@ class ApiClient:
         date: Optional[str],
         filters: Optional[Dict[str, Any]] = None,
         max_calls: int = 500,
+        limit: int = 50,
         include: str = ""
     ) -> List[Dict[str, Any]]:
         """
@@ -120,7 +163,6 @@ class ApiClient:
         """
         all_calls: List[Dict[str, Any]] = []
         page: int = 1
-        limit: int = 50  # Maximum for KeyCRM API according to docs
 
         # If date is provided, create filters for the range
         if date:
@@ -144,11 +186,10 @@ class ApiClient:
             data = response.get('data', [])
             if not data:
                 break
-
             if date:
                 filtered_data = [
                     call for call in data
-                    if call.get('created_at', '')[:10] == date
+                    if datetime.fromisoformat(call.get('created_at', '')).date() == date
                 ]
                 all_calls.extend(filtered_data)
             else:
@@ -167,26 +208,78 @@ class ApiClient:
 
         return all_calls[:max_calls]  # Trim to max_calls just in case
 
-    def fetch_pipeline_statuses(self, pipeline_id: int) -> Dict[str, Any]:
+    def fetch_pipeline_statuses(self, pipeline_id: int, limit: int = 50, max_pages: int = 100) -> Dict[str, Any]:
         """
-        Fetch statuses for a given pipeline_id.
+        Fetch all statuses for a given pipeline_id with pagination.
         Args:
             pipeline_id (int): ID of the pipeline.
+            limit (int): Number of items per page (max 50).
+            max_pages (int): Maximum number of pages to fetch.
         Returns:
-            dict: API response with statuses.
+            dict: API response with all statuses.
         """
         url: str = f"{self.base_url}/pipelines/{pipeline_id}/statuses"
+        all_statuses = []
+        page = 1
         try:
-            response = requests.get(
-                url,
-                headers=self.headers,
-                timeout=TIMEOUT
-            )
-            response.raise_for_status()
-            return response.json()
+            while page <= max_pages:
+                params = {"limit": limit, "page": page}
+                response = requests.get(
+                    url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=TIMEOUT
+                )
+                response.raise_for_status()
+                data = response.json()
+                page_data = data.get('data', []) if isinstance(data, dict) else data
+                if not page_data:
+                    break
+                all_statuses.extend(page_data)
+                # If less than limit, last page reached
+                if len(page_data) < limit:
+                    break
+                page += 1
+            return {"error": False, "data": all_statuses}
         except requests.exceptions.RequestException as e:
             return {
                 "error": True,
                 "message": f"Error fetching statuses for pipeline {pipeline_id}: {str(e)}",
                 "data": []
             }
+    
+    def fetch_all_pipeline_cards(self, pipeline_ids: List[int], limit: int = 50, include: str = "") -> Optional[List[Dict[str, Any]]]:
+        """
+        Fetch all cards for all pipeline_id in range(17) and store in Streamlit session_state.
+        Cards are hidden from UI and can be used for internal filtering.
+        Returns a list of card dicts when save_to_session is False, otherwise stores in session and returns None.
+        """
+        all_cards: List[Dict[str, Any]] = []
+        for pipeline_id in pipeline_ids:
+            page = 1
+            while True:
+                response = self.fetch_cards(
+                    limit=limit,
+                    page=page,
+                    include=include,
+                    filters={"pipeline_id": pipeline_id}
+                )
+
+                if response.get("error"):
+                    print(f"Error on page {page}: {response.get('message')}")
+                    break
+
+                data = response.get("data", [])
+
+                if not data:
+                    break  # cards are finished
+
+                all_cards.extend(data)
+
+                # If less than limit — this is the last page
+                if len(data) < limit:
+                    break
+
+                page += 1  # otherwise go to the next page
+        return all_cards
+    

@@ -22,3 +22,7 @@ WEBHOOK_PROD_URL = "https://primary-production-76c7.up.railway.app/webhook/get-k
 
 # Test webhook URL (use for testing)
 WEBHOOK_TEST_URL = "https://primary-production-76c7.up.railway.app/webhook-test/get-keycrm-today"
+
+# === Data Storage ===
+# Directory to store snapshot data
+SNAPSHOT_DIR = "data/snapshots"

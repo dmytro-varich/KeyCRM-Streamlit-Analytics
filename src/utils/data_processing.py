@@ -1,108 +1,111 @@
-import pytz
-import requests
 import streamlit as st
-from datetime import datetime
-from config.settings import WEBHOOK_PROD_URL
+from typing import List, Dict, Tuple, Any
+from src.utils.file_utils import load_json_file
+from src.utils.time_utils import get_kyiv_date, today_date
 from src.utils.analytics import build_manager_category_dict
 
-kyiv_tz = pytz.timezone("Europe/Kyiv")
-today = datetime.now(kyiv_tz).strftime("%Y-%m-%d")
-
-def get_kyiv_date(created_at_str):
-    try:
-        dt_utc = datetime.strptime(created_at_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=pytz.utc)
-        dt_kyiv = dt_utc.astimezone(kyiv_tz)
-        return dt_kyiv.strftime("%Y-%m-%d")
-    except Exception:
-        return ""
-
-def process_all_data(api_client, webhook_url: str = WEBHOOK_PROD_URL) -> None:
+def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: List[Dict[str, Any]]) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
     """
-    Process all data: new leads from webhook + calls from KeyCRM API.
-    Saves analytics and cards to Streamlit session_state.
-    Args:
-        ApiClient (Type): KeyCRM API client class (default: imported ApiClient).
-        webhook_url (str): Webhook URL to fetch new leads.
-    Returns:
-        None
+    Processes all cards and classifies them as New or Previous
+    for 'Base' (not Diamonds) and 'Target' (Diamonds, Diamenty, Sumizhnyky).
     """
-    with st.spinner("Loading all data..."):
-        try:
-            # Fetch new leads from webhook
-            resp = requests.get(webhook_url, timeout=20)
-            resp.raise_for_status()
-            if not resp.text.strip():
-                st.warning("No new leads from webhook")
-                webhook_data = []
-                card_ids = None
-            else:
-                webhook_data = resp.json()
-                card_ids = list({item['card_id'] for item in webhook_data if 'card_id' in item})
 
-            cards_new = []
-            if card_ids:
-                    # Include custom fields and managers in card data
-                    response_new = api_client.fetch_cards_by_ids(card_ids, include="custom_fields,manager")
-                    if not response_new.get('error'):
-                        cards_new = response_new.get('data', [])
-            else:
-                cards_new = []
+    # --- Get previous state ---
+    previous_hidden_cards = base_cards
+    prev_cards_by_id = {
+        card["id"]: card for card in previous_hidden_cards if not card.get("is_finished", False)
+    }
 
-            # Fetch calls for today
-            calls_today = api_client.fetch_all_calls(max_calls=400, date=today, include="")
-            lead_ids = [call.get('lead_id') for call in calls_today if call.get('lead_id') is not None]
+    # --- Get today's calls ---
+    calls_today = api_client.fetch_all_calls(max_calls=400, date=today_date, include="")
+    called_card_ids = {
+        call["lead_id"]
+        for call in calls_today
+        if call.get("lead_id") and get_kyiv_date(call.get("created_at", "")) == str(today_date)
+    }
 
-            # Normalize lead IDs: keep only values convertible to int
-            normalized_lead_ids = set()
-            for lid in lead_ids:
-                if lid is None:
-                    continue
-                try:
-                    # Pass an int directly or convert other values to str first to satisfy type checkers
-                    if isinstance(lid, int):
-                        normalized_lead_ids.add(lid)
-                    else:
-                        normalized_lead_ids.add(int(str(lid)))
-                except (TypeError, ValueError):
-                    continue
-            unique_lead_ids = list(normalized_lead_ids)
+    # --- Set up pipeline IDs ---
+    base_pipelines = [1, 4, 7, 10, 13]                               # Not Diamonds ("Base")
+    target_pipelines = [2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 16, 17]    # Diamonds / Diamenty / Sumizhnyky
 
-            cards_by_leads = []
-            if unique_lead_ids:
-                response_leads = api_client.fetch_cards_by_ids(unique_lead_ids, include="custom_fields,manager")
-                if not response_leads.get('error'):
-                    cards_by_leads = response_leads.get('data', [])
+    new_cards = []
+    previous_cards = []
 
-            # "Нові": cards created today (from webhook and calls)
-            cards_calls_new = [card for card in cards_by_leads if get_kyiv_date(card.get('created_at', '')) == today and card.get('manager_id', False)]
-            cards_new_final = cards_new + cards_calls_new
+    # --- Main loop over cards ---
 
-            # "Попередні": cards with a call today, but not created today
-            cards_calls_final = [card for card in cards_by_leads if get_kyiv_date(card.get('created_at', '')) != today and card.get('manager_id', False)]
+    for card in all_cards:
+        card_id = card["id"]
+        pipeline_id = card.get("pipeline_id")
+        manager_id = card.get("manager_id")
 
-            # Remove duplicates (if any)
-            new_ids = {card.get('id') for card in cards_new_final}
-            cards_calls_final = [card for card in cards_calls_final if card.get('id') not in new_ids]
+    # Skip if no manager
+        if manager_id is None:
+            continue
 
-            filtered_card = {
-                "Нові": cards_new_final,
-                "Попередні": cards_calls_final
-            }
+        card_created_kyiv = get_kyiv_date(card.get("created_at", ""))
+        card_updated_kyiv = get_kyiv_date(card.get("updated_at", ""))
 
-            # Combine all cards into one list
-            all_cards = filtered_card["Нові"] + filtered_card["Попередні"]
+    # --- If the card already existed before ---
+        if card_id in prev_cards_by_id:
+            prev_card = prev_cards_by_id[card_id]
+            prev_pipeline = prev_card["pipeline_id"]
+            prev_manager_id = prev_card.get("manager_id")
 
-            # Build analytics dictionary
-            manager_dict = build_manager_category_dict(filtered_card)
+            # ▪ Target: New (moved to target today)
+            if prev_pipeline != pipeline_id and pipeline_id in target_pipelines:
+                new_cards.append(card)
 
-            # Save to Streamlit session_state
-            st.session_state['all_data'] = {
-                'cards': all_cards,
-                'analytics': manager_dict,
-                'count': len(all_cards)
-            }
+            # ▪ Target: Previous (already in target, manager exists, there was a call)
+            elif (
+                prev_pipeline == pipeline_id
+                and pipeline_id in target_pipelines
+                and card_id in called_card_ids
+            ):
+                previous_cards.append(card)
 
-            st.success(f"✅ Received {len(all_cards)} cards")
-        except Exception as e:
+            # ▪ Base: New (manager appeared today and there was a call)
+            elif (
+                pipeline_id in base_pipelines
+                and prev_manager_id is None
+                and manager_id is not None
+                and card_updated_kyiv == str(today_date)
+                and card_id in called_card_ids
+            ):
+                new_cards.append(card)
 
-            st.error(f"❌ Error processing data: {e}")
+            # ▪ Base: Previous (manager already existed, there was a call)
+            elif (
+                pipeline_id in base_pipelines
+                and prev_manager_id is not None
+                and manager_id is not None
+                and card_id in called_card_ids
+            ):
+                previous_cards.append(card)
+
+    # --- If the card is new (was not in previous_hidden_cards) ---
+        else:
+            # ▪ Target: New (created today and manager exists)
+            if (
+                pipeline_id in target_pipelines
+                and card_created_kyiv == str(today_date)
+                and manager_id is not None
+            ):
+                new_cards.append(card)
+
+            # ▪ Base: New (manager appeared immediately and there was a call)
+            elif (
+                pipeline_id in base_pipelines
+                and manager_id is not None
+                and card_id in called_card_ids
+                and card_created_kyiv == str(today_date)
+            ):
+                new_cards.append(card)
+
+    filtered_all_cards = {
+        "Нові": new_cards,
+        "Попередні": previous_cards
+    }
+
+    manager_dict = build_manager_category_dict(filtered_all_cards)
+
+    return (filtered_all_cards, manager_dict)
