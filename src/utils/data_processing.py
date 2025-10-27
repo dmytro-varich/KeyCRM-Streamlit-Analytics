@@ -23,7 +23,7 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
         for call in calls_today
         if call.get("lead_id")
         and get_kyiv_date(call.get("created_at", "")) == str(today_date)
-        and call.get("state") in ["completed"]
+        # and call.get("state") in ["completed"]
     }
 
     # --- Set up pipeline IDs ---
