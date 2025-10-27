@@ -15,7 +15,6 @@ sys.path.insert(0, str(root_path))
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI 
 from src.utils.time_utils import today_date, KYIV_TZ
-from src.utils.file_utils import load_json_file
 from src.utils.data_processing import process_all_data
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
 from src.components.tables import render_manager_tables, create_simple_dataframe
@@ -28,7 +27,7 @@ def main() -> None:
     Sets up UI and handles user actions.
     """
     api_client = ApiClient()
-    pipeline_ids = list(range(1, 18))  # List of pipeline IDs to fetch
+    pipeline_ids = [1, 3, 16, 20, 31, 2, 4, 15, 19, 32, 22, 24, 26, 30, 33, 46, 18] 
 
     # Initialize MongoDB client and get collection
     client = init_mongo_client(MONGODB_URI)

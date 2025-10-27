@@ -282,4 +282,41 @@ class ApiClient:
 
                 page += 1  # otherwise go to the next page
         return all_cards
-    
+
+    def fetch_all_pipelines(self, limit: int = 50) -> Dict[str, Any]:
+        """
+        Fetch all pipelines with pagination.
+        Args:
+            limit (int): Number of pipelines per page.
+        Returns:
+            dict: API response with all pipeline data.
+        """
+        url: str = f"{self.base_url}/pipelines"
+        all_pipelines = []
+        page = 1
+        try:
+            while True:
+                params = {"limit": limit, "page": page}
+                response = requests.get(
+                    url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=TIMEOUT
+                )
+                response.raise_for_status()
+                data = response.json()
+                page_data = data.get('data', []) if isinstance(data, dict) else data
+                if not page_data:
+                    break
+                all_pipelines.extend(page_data)
+                # If less than limit, last page reached
+                if len(page_data) < limit:
+                    break
+                page += 1
+            return {"error": False, "data": all_pipelines}
+        except requests.exceptions.RequestException as e:
+            return {
+                "error": True,
+                "message": f"Error fetching pipelines: {str(e)}",
+                "data": []
+            }

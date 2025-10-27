@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from typing import Dict, Any, List
-from src.utils.analytics import init_category, get_custom_field
+from src.utils.analytics import init_category, get_custom_field, define_pipeline
 
 
 def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
@@ -82,11 +82,20 @@ def create_simple_dataframe(cards: Dict[str, List[Dict[str, Any]]]) -> pd.DataFr
         for card in card_list:
             created = (card.get("created_at") or "")[:10]
             updated = (card.get("updated_at") or "")[:10]
+            pipeline_id = card.get("pipeline_id")
+            if pipeline_id is None:
+                pipeline_label = "N/A"
+            else:
+                try:
+                    pipeline_label = define_pipeline(int(pipeline_id))
+                except (TypeError, ValueError):
+                    pipeline_label = "N/A"
+
             row = {
                 "Тип": state,
                 "ID": card.get("id"),
                 "Назва": card.get("title"),
-                "Воронка": card.get("pipeline_id"),
+                "Воронка": pipeline_label or "N/A",
                 "Менеджер": card.get("manager", {}).get("full_name", "N/A"),
                 "Прогрітий (готовий працювати)": get_custom_field(card, "ПРОГРІТИЙ (готовий працювати)"),
                 "Закр. Зустріч КИЇВ": get_custom_field(card, "Закр. Зустріч КИЇВ"),

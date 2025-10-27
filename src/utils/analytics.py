@@ -1,17 +1,42 @@
 from typing import List, Dict, Any, Optional
 
+def define_pipeline(pipeline_id: int) -> Optional[str]:
+    """
+    Returns pipeline name based on pipeline ID.
+    """
+    pipeline_map = {
+        1: "1. Електрики - БАЗА",
+        2: "2. Електрики - АЛМАЗИ (протягом року)",
+        3: "4. Дизайнери - БАЗА",
+        4: "5. Дизайнери - АЛМАЗИ",
+        15: "8. Будівельники - АЛМАЗИ",
+        16: "7. Будівельники - БАЗА",
+        18: "16. Суміжники - ДО НАС",
+        19: "11. Ріелтори - АЛМАЗИ",
+        20: "10. Ріелтори - БАЗА",
+        22: "3. Електрики - ДІАМАНТИ (протягом місяця)",
+        24: "6. Дизайнери - ДІАМАНТИ",
+        26: "9. Будівельники - ДІАМАНТИ",
+        30: "12. Ріелтори - ДІАМАНТИ",
+        31: "13. Архітектори - БАЗА",
+        32: "14. Архітектори - АЛМАЗИ",
+        33: "15. Архітектори - ДІАМАНТИ",
+        46: "17. Суміжники - ПІСЛЯ НАС"
+    }
+    return pipeline_map.get(pipeline_id)
+
 
 def define_category(pipeline_id: int) -> Optional[str]:
     """
     Returns category name based on pipeline ID.
     """
-    if pipeline_id in [1, 4, 7, 10, 13]:
+    if pipeline_id in [1, 3, 16, 20, 31]:
         return "База"
-    elif pipeline_id in [16, 17]:
+    elif pipeline_id in [46, 18]:
         return "Суміжні"
-    elif pipeline_id in [2, 5, 8, 11, 14]:
+    elif pipeline_id in [2, 4, 15, 19, 32]:
         return "Алмази"
-    elif pipeline_id in [3, 6, 9, 12, 15]:
+    elif pipeline_id in [22, 24, 26, 30, 33]:
         return "Діаманти"
     return None
 

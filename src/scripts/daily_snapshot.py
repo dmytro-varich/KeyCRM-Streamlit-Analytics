@@ -11,7 +11,7 @@ from src.utils.db_utils import init_mongo_client, get_database, get_collection
 
 def main():
     api = ApiClient()
-    pipeline_ids = list(range(1, 18))
+    pipeline_ids = [1, 3, 16, 20, 31, 2, 4, 15, 19, 32, 22, 24, 26, 30, 33, 46, 18]
 
     cards = api.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
     cards = cards or []
