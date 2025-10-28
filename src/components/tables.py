@@ -135,18 +135,10 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
         for manager, categories in manager_dict.items():
             default_categories = ["База", "Суміжні", "Алмази", "Діаманти"]
             custom_keys = ["Рефералка", "Зустріч", "Навчання", "Планування"]
-            total = {
-                "Нові": {"Прогріті": 0, "Не прогріті": 0},
-                "Попередні": {"Прогріті": 0, "Не прогріті": 0},
-                "Не кваліфіковані": 0,
-                "Рефералка": 0,
-                "Зустріч": 0,
-                "Навчання": 0,
-                "Планування": 0,
-            }
+            total = init_category()
             export_rows = []
             for category in default_categories:
-                stats = categories.get(category, total.copy())
+                stats = categories.get(category, init_category())
                 export_rows.append({
                     "Категорія": category,
                     "Нові - Прогріті": stats['Нові']['Прогріті'],
