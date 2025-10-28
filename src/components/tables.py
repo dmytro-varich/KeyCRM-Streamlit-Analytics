@@ -204,6 +204,5 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
             # Sheet name is the manager's name (up to 31 characters)
             sheet_name = manager[:31]
             df.to_excel(writer, index=False, sheet_name=sheet_name)
-        writer.close()
     excel_buffer.seek(0)
     return excel_buffer
