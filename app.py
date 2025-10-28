@@ -17,8 +17,8 @@ from config.settings import MONGODB_URI
 from src.utils.time_utils import today_date, KYIV_TZ
 from src.utils.data_processing import process_all_data
 from src.utils.db_utils import init_mongo_client, get_database, get_collection
-from src.components.tables import render_manager_tables, create_simple_dataframe
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
+from src.components.tables import render_manager_tables, create_simple_dataframe, get_managers_excel_download
 
 
 def main() -> None:
@@ -149,6 +149,15 @@ def display_results() -> None:
     if "all_data" in st.session_state:
         data = st.session_state["all_data"]
         st.header("📑 Аналітика менеджерів")
+        # Button to download an excel file with all manager tables
+        excel_buffer = get_managers_excel_download(data["analytics"])
+        st.download_button(
+            label="⬇️ Завантажити всі таблиці",
+            data=excel_buffer,
+            file_name=f"keycrm_analytics_all_managers_{today_date}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
         # Render manager analytics tables
         render_manager_tables(data["analytics"])
 
