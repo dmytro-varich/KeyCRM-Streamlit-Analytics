@@ -67,7 +67,23 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
         html += f"<td>{total['Зустріч']}</td>"
         html += f"<td>{total['Навчання']}</td>"
         html += f"<td>{total['Планування']}</td>"
-        html += "</tr></table>"
+        html += "</tr>"
+
+        # --- Новый код: строка "Всього дозвонів за день" ---
+        # Суммируем по всем категориям для Нові и Попередні
+        total_calls_new = 0
+        total_calls_prev = 0
+        for category in default_categories:
+            stats = categories.get(category, init_category())
+            total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
+            total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
+
+        html += "<tr style='font-weight:bold;'>"
+        html += "<td>Всього дозвонів за день</td>"
+        html += f"<td colspan='10'>{total_calls_new + total_calls_prev}</td>"
+        html += "</tr>"
+
+        html += "</table>"
 
         st.markdown(html, unsafe_allow_html=True)
 
