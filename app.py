@@ -69,9 +69,11 @@ def main() -> None:
 
     # Button to trigger analytics generation
     if st.button("🔎 Переглянути аналітику", type="primary"):
-        st.session_state["loading"] = True  # Set loading flag
-        st.session_state["all_data"] = None
-
+        for key in ["loading", "all_data"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state["loading"] = True
+        st.rerun()
     st.markdown("---")
 
     # If loading flag is set, show loading status and process data
