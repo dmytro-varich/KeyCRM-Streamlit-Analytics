@@ -30,6 +30,6 @@ jobs:
           
       - name: "🏃 Run daily_snapshot.py"
         working-directory: src
-        run: python scripts/daily_snapshot.py
+        run: python actions/daily_snapshot.py
         
 

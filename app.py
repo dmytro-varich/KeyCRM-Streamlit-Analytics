@@ -14,24 +14,27 @@ sys.path.insert(0, str(root_path))
 # Project-specific imports
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI 
-from src.utils.time_utils import today_date, KYIV_TZ
+from src.utils.time_utils import today_date, now_kyiv
 from src.utils.data_processing import process_all_data
-from src.utils.db_utils import init_mongo_client, get_database, get_collection
+from src.db.db_utils import init_mongo_client, get_database, get_collection
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
 from src.components.tables import render_manager_tables, create_simple_dataframe, get_managers_excel_download
 
+# Initialize api_client 
+api_client = ApiClient()
+
+# Initialize MongoDB client and get collection
+client = init_mongo_client(MONGODB_URI)
+db = get_database(client, "snapshots_db")
 
 def main() -> None:
     """
     Main entry point for KeyCRM Analytics Streamlit app.
     Sets up UI and handles user actions.
     """
-    api_client = ApiClient()
     pipeline_ids = [1, 3, 16, 20, 31, 2, 4, 15, 19, 32, 22, 24, 26, 30, 33, 46, 18] 
 
-    # Initialize MongoDB client and get collection
-    client = init_mongo_client(MONGODB_URI)
-    db = get_database(client, "snapshots_db")
+    # Get collection
     collection = get_collection(db, "snapshots")
 
     # Streamlit page configuration
@@ -99,15 +102,20 @@ def main() -> None:
 
                 # Process all data and store results in session state
                 filtered_all_cards, manager_dict = process_all_data(api_client, all_cards, base_cards)
-                st.session_state["all_data"] = {
+                result = {
+                    "timestamp": now_kyiv,
                     "cards": filtered_all_cards,
                     "analytics": manager_dict,
                     "count": len(filtered_all_cards)
                 }
+
+                analytics_collection = get_collection(db, "analytics_results")
+                analytics_collection.insert_one(result)
+                st.session_state["all_data"] = result
                 msg_placeholder.write("Підготовка результатів...")
 
                 # Clear loading messages and mark as complete
-                msg_placeholder.empty()
+                msg_placeholder.write("Вже скоро аналітика по менеджерам буде готово!")
                 status.update(label="✅ Аналітику згенеровано!", state="complete")
 
         st.session_state["loading"] = False  # Remove loading flag
@@ -125,11 +133,10 @@ def main() -> None:
                 cards = cards or []
                 cards = [card for card in cards if not card.get("is_finished", False)]
                 
-                now_kyiv = datetime.now(KYIV_TZ)
                 snapshot_data = {
-                    "timestamp": now_kyiv.isoformat(),           # Human-readable Kyiv time
-                    "date": str(today_date),                     # Date as string (Kyiv)
-                    "createdAt": now_kyiv,                       # For MongoDB TTL index (must be datetime object)
+                    "timestamp": now_kyiv,           # Human-readable Kyiv time
+                    "date": str(today_date),         # Date as string (Kyiv)
+                    "createdAt": now_kyiv,           # For MongoDB TTL index (must be datetime object)
                     "cards": cards,
                     "count": len(cards)
                 }
@@ -146,23 +153,36 @@ def display_results() -> None:
     Display analytics results and cards table.
     """
     if "all_data" in st.session_state:
-        data = st.session_state["all_data"]
-        st.header(f"📑 Аналітика менеджерів - ({today_date})")
+        analytics_collection = get_collection(db, "analytics_results")
+        latest_result = analytics_collection.find_one(sort=[("timestamp", -1)])
+        if not latest_result:
+            st.warning("⚠️ Немає доступних результатів аналітики для відображення.")
+            return
+
+        analytics_data = latest_result.get("analytics")
+        if not analytics_data:
+            st.warning("⚠️ Немає даних аналітики для завантаження або відображення.")
+            return
+
+        st.header(f"📑 Аналітика менеджерів ({today_date})")
         # Button to download an excel file with all manager tables
-        excel_buffer = get_managers_excel_download(data["analytics"])
-        st.download_button(
-            label="⬇️ Завантажити всі таблиці",
-            data=excel_buffer,
-            file_name=f"keycrm_analytics_all_managers_{today_date}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        excel_buffer = get_managers_excel_download(analytics_data)
+        if excel_buffer:
+            st.download_button(
+                label="⬇️ Завантажити всі таблиці",
+                data=excel_buffer,
+                file_name=f"keycrm_analytics_all_managers_{today_date}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.info("ℹ️ Немає файлу для завантаження.")
 
         # Render manager analytics tables
-        render_manager_tables(data["analytics"])
+        render_manager_tables(analytics_data)
 
         # Show all cards in an expandable dataframe
         with st.expander("📋 Усі картки"):
-            df_cards = create_simple_dataframe(data["cards"])
+            df_cards = create_simple_dataframe(latest_result.get("cards", []))
             st.dataframe(df_cards, width="stretch")
 
 
