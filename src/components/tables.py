@@ -10,7 +10,7 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
     Displays analytics as HTML tables with a grouped column "Closed from them".
     """
     default_categories = ["База", "Суміжні", "Алмази", "Діаманти"]
-    custom_keys = ["Рефералка", "Зустріч", "Навчання", "Планування"]
+    custom_keys = ["Рефералка", "Зустріч", "Навчання", "Планування (надіслав)", "Планування (пообіцяв)"]
 
     for manager, categories in manager_dict.items():
         st.markdown(f"### 👤 {manager}")
@@ -22,12 +22,12 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
             <th colspan='2'>Нові</th>
             <th colspan='2'>Попередні</th>
             <th rowspan='2'>Не кваліфіковані</th>
-            <th colspan='4'>З них закрито:</th>
+            <th colspan='5'>З них закрито:</th>
         </tr>
         <tr style='font-weight:bold;'>
             <th>Прогріті</th><th>Не прогріті</th>
             <th>Прогріті</th><th>Не прогріті</th>
-            <th>Рефералка</th><th>Зустріч</th><th>Навчання</th><th>Планування</th>
+            <th>Рефералка</th><th>Зустріч</th><th>Навчання</th><th>Планування (надіслав)</th><th>Планування (пообіцяв)</th>
         </tr>
         """
 
@@ -46,7 +46,8 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
             html += f"<td>{stats['Рефералка']}</td>"
             html += f"<td>{stats['Зустріч']}</td>"
             html += f"<td>{stats['Навчання']}</td>"
-            html += f"<td>{stats['Планування']}</td>"
+            html += f"<td>{stats['Планування (надіслав)']}</td>"
+            html += f"<td>{stats['Планування (пообіцяв)']}</td>"
             html += "</tr>"
 
             # totals
@@ -67,7 +68,8 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
         html += f"<td>{total['Рефералка']}</td>"
         html += f"<td>{total['Зустріч']}</td>"
         html += f"<td>{total['Навчання']}</td>"
-        html += f"<td>{total['Планування']}</td>"
+        html += f"<td>{total['Планування (надіслав)']}</td>"
+        html += f"<td>{total['Планування (пообіцяв)']}</td>"
         html += "</tr>"
 
         # --- Row "Всього дозвонів за день" ---
@@ -75,12 +77,15 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
         total_calls_prev = 0
         for category in default_categories:
             stats = categories.get(category, init_category())
-            total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
-            total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
+            if category in ['База']:
+                total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
+                total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
+            if category in ['Суміжні', 'Алмази', 'Діаманти']:
+                total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
 
         html += "<tr style='font-weight:bold;'>"
         html += "<td>Всього дозвонів за день</td>"
-        html += f"<td colspan='10'>{total_calls_new + total_calls_prev}</td>"
+        html += f"<td colspan='11'>{total_calls_new + total_calls_prev}</td>"
         html += "</tr>"
         html += "</table>"
 
@@ -134,22 +139,23 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
     with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
         for manager, categories in manager_dict.items():
             default_categories = ["База", "Суміжні", "Алмази", "Діаманти"]
-            custom_keys = ["Рефералка", "Зустріч", "Навчання", "Планування"]
+            custom_keys = ["Рефералка", "Зустріч", "Навчання", "Планування (надіслав)", "Планування (пообіцяв)"]
             total = init_category()
             export_rows = []
             for category in default_categories:
                 stats = categories.get(category, init_category())
                 export_rows.append({
                     "Категорія": category,
-                    "Нові - Прогріті": stats['Нові']['Прогріті'],
-                    "Нові - Не прогріті": stats['Нові']['Не прогріті'],
-                    "Попередні - Прогріті": stats['Попередні']['Прогріті'],
-                    "Попередні - Не прогріті": stats['Попередні']['Не прогріті'],
-                    "Не кваліфіковані": stats['Не кваліфіковані'],
-                    "Рефералка": stats['Рефералка'],
-                    "Зустріч": stats['Зустріч'],
-                    "Навчання": stats['Навчання'],
-                    "Планування": stats['Планування'],
+                    "Нові - Прогріті": stats.get('Нові', {}).get('Прогріті', 0),
+                    "Нові - Не прогріті": stats.get('Нові', {}).get('Не прогріті', 0),
+                    "Попередні - Прогріті": stats.get('Попередні', {}).get('Прогріті', 0),
+                    "Попередні - Не прогріті": stats.get('Попередні', {}).get('Не прогріті', 0),
+                    "Не кваліфіковані": stats.get('Не кваліфіковані', 0),
+                    "Рефералка": stats.get('Рефералка', 0),
+                    "Зустріч": stats.get('Зустріч', 0),
+                    "Навчання": stats.get('Навчання', 0),
+                    "Планування (надіслав)": stats.get('Планування (надіслав)', 0),
+                    "Планування (пообіцяв)": stats.get('Планування (пообіцяв)', 0),
                 })
                 # Summarizing the results
                 for s in ["Нові", "Попередні"]:
@@ -168,7 +174,8 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
                 "Рефералка": total['Рефералка'],
                 "Зустріч": total['Зустріч'],
                 "Навчання": total['Навчання'],
-                "Планування": total['Планування'],
+                "Планування (надіслав)": total['Планування (надіслав)'],
+                "Планування (пообіцяв)": total['Планування (пообіцяв)'],
             })
 
             # Row "Всього дозвонів за день"
@@ -176,8 +183,11 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
             total_calls_prev = 0
             for category in default_categories:
                 stats = categories.get(category, init_category())
-                total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
-                total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
+                if category in ['База']:
+                    total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
+                    total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
+                if category in ['Суміжні', 'Алмази', 'Діаманти']:
+                    total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
 
             export_rows.append({
                 "Категорія": "Всього дозвонів за день",
@@ -189,7 +199,8 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
                 "Рефералка": "",
                 "Зустріч": "",
                 "Навчання": "",
-                "Планування": total_calls_new + total_calls_prev,
+                "Планування (надіслав)": "", 
+                "Планування (пообіцяв)": total_calls_new + total_calls_prev,
             })
 
             df = pd.DataFrame(export_rows)

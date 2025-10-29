@@ -69,7 +69,8 @@ def init_category() -> Dict[str, Any]:
         "Рефералка": 0,
         "Зустріч": 0,
         "Навчання": 0,
-        "Планування": 0
+        "Планування (надіслав)": 0,
+        "Планування (пообіцяв)": 0
     }
 
 
@@ -82,13 +83,17 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
 
     meeting_fields = {"Закр. Зустріч КИЇВ", "Закр. Зустріч ONLINE"}
     training_field = "Закр. Навчання В ЗАПИСІ"
-    not_qualified_status_ids = {326, 341, 386, 396, 435, 425, 534, 524, 361, 450, 411}
-    plan_status_ids = {365, 414, 452}
+    not_qualified_status_ids = {326, 341, 386, 396, 435, 425, 534, 524, 361, 450, 411, 626, 548, 642, 616}
+    plan_sent_status_ids = {365, 414, 452, 823, 646}
+    plan_promised_status_ids = {364, 802, 812, 822, 911}
+    hot_contacts_status_ids = {344, 398, 437, 536, 629, 363, 413, 451, 821, 644, 867, 477}
 
     for state, card_list in cards.items():
         for card in card_list:
             manager = card.get("manager", {})
             manager_key = f"{manager.get('first_name', 'N/A')} {manager.get('last_name', 'N/A')}".strip()
+
+            status_id = card.get("status_id")
 
             pipeline_id = card.get("pipeline_id")
             if not isinstance(pipeline_id, int):
@@ -102,9 +107,9 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
             custom_fields = card.get("custom_fields", [])
             hot_contact = False             # warmed up (ready to work)
             kvalifikovanyi = False          # fully qualified
-            referral = False               # referral
-            meeting = False                # meeting
-            training = False               # training
+            referral = False                # referral
+            meeting = False                 # meeting
+            training = False                # training
 
             for field in custom_fields:
                 name = field.get("name")
@@ -121,7 +126,7 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
                 elif name == training_field:
                     training = bool(value)
 
-            prog_state = "Прогріті" if hot_contact else "Не прогріті"
+            prog_state = "Прогріті" if hot_contact or status_id in hot_contacts_status_ids else "Не прогріті"
 
             # --- initialization of nested structures ---
             if manager_key not in result:
@@ -138,10 +143,11 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
             if training:
                 result[manager_key][category]["Навчання"] += 1
 
-            status_id = card.get("status_id")
             # Planning
-            if status_id in plan_status_ids:
-                result[manager_key][category]["Планування"] += 1
+            if status_id in plan_sent_status_ids:
+                result[manager_key][category]["Планування (надіслав)"] += 1
+            if status_id in plan_promised_status_ids:
+                result[manager_key][category]["Планування (пообіцяв)"] += 1
 
             # Not qualified
             if (not kvalifikovanyi) or (status_id in not_qualified_status_ids):

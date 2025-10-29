@@ -51,7 +51,6 @@ def main() -> None:
     with st.expander("📘 Як працює класифікація аналітики?"):
         st.markdown(how_to_work_text)
 
-
     # Load latest snapshot from MongoDB
     snapshot = collection.find_one(sort=[("createdAt", -1)])
     if snapshot:
@@ -148,7 +147,7 @@ def display_results() -> None:
     """
     if "all_data" in st.session_state:
         data = st.session_state["all_data"]
-        st.header("📑 Аналітика менеджерів")
+        st.header(f"📑 Аналітика менеджерів - ({today_date})")
         # Button to download an excel file with all manager tables
         excel_buffer = get_managers_excel_download(data["analytics"])
         st.download_button(

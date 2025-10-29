@@ -222,7 +222,7 @@ class ApiClient:
         all_statuses = []
         page = 1
         try:
-            while page <= max_pages:
+            while True:
                 params = {"limit": limit, "page": page}
                 response = requests.get(
                     url,
