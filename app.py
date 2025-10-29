@@ -14,7 +14,7 @@ sys.path.insert(0, str(root_path))
 # Project-specific imports
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI 
-from src.utils.time_utils import today_date, now_kyiv
+from src.utils.time_utils import today_date, now_kyiv, utc_now
 from src.utils.data_processing import process_all_data
 from src.db.db_utils import init_mongo_client, get_database, get_collection
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
@@ -106,6 +106,7 @@ def main() -> None:
                 filtered_all_cards, manager_dict = process_all_data(api_client, all_cards, base_cards)
                 result = {
                     "timestamp": now_kyiv,
+                    "createdAt": utc_now,
                     "cards": filtered_all_cards,
                     "analytics": manager_dict,
                     "count": len(filtered_all_cards)
@@ -138,7 +139,7 @@ def main() -> None:
                 snapshot_data = {
                     "timestamp": now_kyiv,           # Human-readable Kyiv time
                     "date": str(today_date),         # Date as string (Kyiv)
-                    "createdAt": now_kyiv,           # For MongoDB TTL index (must be datetime object)
+                    "createdAt": utc_now,            # For MongoDB TTL index (must be datetime object)
                     "cards": cards,
                     "count": len(cards)
                 }
@@ -156,7 +157,7 @@ def display_results() -> None:
     """
     if "all_data" in st.session_state:
         analytics_collection = get_collection(db, "analytics_results")
-        latest_result = analytics_collection.find_one(sort=[("timestamp", -1)])
+        latest_result = analytics_collection.find_one(sort=[("createdAt", -1)])
         if not latest_result:
             st.warning("⚠️ Немає доступних результатів аналітики для відображення.")
             return

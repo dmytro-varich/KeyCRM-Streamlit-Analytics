@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import json
 from src.api.client import ApiClient
 from config.settings import MONGODB_URI
-from src.utils.time_utils import today_date, now_kyiv
+from src.utils.time_utils import today_date, now_kyiv, utc_now
 from src.db.db_utils import init_mongo_client, get_database, get_collection
 
 def main():
@@ -18,8 +18,8 @@ def main():
     
     snapshot_data = {
         "timestamp": now_kyiv,           # Human-readable Kyiv time
-        "date": str(today_date),         # Date as string (Kyiv)
-        "createdAt": now_kyiv,           # For MongoDB TTL index (must be datetime object)
+        "date": str(today_date),         # Date string for filtering
+        "createdAt": utc_now,            # For MongoDB TTL index (must be datetime object)
         "cards": cards,
         "count": len(cards)
     }
