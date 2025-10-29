@@ -74,6 +74,8 @@ def main() -> None:
         for key in ["loading", "all_data"]:
             if key in st.session_state:
                 del st.session_state[key]
+        st.cache_data.clear()
+        st.cache_resource.clear()
         st.session_state["loading"] = True
         st.rerun()
     st.markdown("---")
