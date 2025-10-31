@@ -127,8 +127,8 @@ def main() -> None:
                     "calls_total": calls_total
                 }
 
-                analytics_collection = get_collection(db, "analytics_results")
-                analytics_collection.insert_one(result)
+                # analytics_collection = get_collection(db, "analytics_results")
+                # analytics_collection.insert_one(result)
                 st.session_state["all_data"] = result
                 msg_placeholder.write("Підготовка результатів...")
 
@@ -173,15 +173,11 @@ def display_results() -> None:
     """
     Display analytics results and cards table.
     """
-    if "all_data" in st.session_state:
-        analytics_collection = get_collection(db, "analytics_results")
-        latest_result = analytics_collection.find_one(sort=[("createdAt", -1)])
-        if not latest_result:
-            st.warning("⚠️ Немає доступних результатів аналітики для відображення.")
-            return
+    if "all_data" in st.session_state and st.session_state["all_data"]:
+        all_data = st.session_state["all_data"]
 
-        analytics_data = latest_result.get("analytics")
-        calls_total =  latest_result.get("calls_total")
+        analytics_data = all_data.get("analytics")
+        calls_total = all_data.get("calls_total")
         if not analytics_data:
             st.warning("⚠️ Немає даних аналітики для завантаження або відображення.")
             return
@@ -204,7 +200,7 @@ def display_results() -> None:
 
         # Show all cards in an expandable dataframe
         with st.expander("📋 Усі картки"):
-            df_cards = create_simple_dataframe(latest_result.get("cards", []))
+            df_cards = create_simple_dataframe(all_data.get("cards", []))
             st.dataframe(df_cards, width="stretch")
 
 
