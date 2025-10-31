@@ -160,14 +160,12 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
             ): 
                 manager_key = manager_id_key_map.get(manager_id) or f"ID:{manager_id}"
                 # Ensure manager dict exists before writing full_name
-                if not isinstance(card.get("manager"), dict):
-                    card["manager"] = {"full_name": manager_key}
-                else:
-                    card["manager"]["full_name"] = manager_key
+                # if not isinstance(card.get("manager"), dict):
+                #     card["manager"] = {"full_name": manager_key}
+                # else:
+                #     card["manager"]["full_name"] = manager_key
                 previous_cards_no_calls.append(card)
-                title = card.get("title")
-                if title == "test8":
-                    st.json(card)
+                
         # --- If the card is new (was not in previous_hidden_cards) ---
         else:
             # ▪ Target: New (created today and manager exists)
