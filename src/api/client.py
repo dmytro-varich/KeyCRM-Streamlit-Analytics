@@ -247,22 +247,34 @@ class ApiClient:
                 "message": f"Error fetching statuses for pipeline {pipeline_id}: {str(e)}",
                 "data": []
             }
-    
-    def fetch_all_pipeline_cards(self, pipeline_ids: List[int], limit: int = 50, include: str = "") -> Optional[List[Dict[str, Any]]]:
+
+    def fetch_all_pipeline_cards(self, 
+        pipeline_ids: List[int], 
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 50, 
+        include: str = ""
+    ) -> Optional[List[Dict[str, Any]]]:
         """
         Fetch all cards for all pipeline_id in range(17) and store in Streamlit session_state.
         Cards are hidden from UI and can be used for internal filtering.
         Returns a list of card dicts when save_to_session is False, otherwise stores in session and returns None.
         """
         all_cards: List[Dict[str, Any]] = []
+        # Iterate pipelines and fetch cards for each with appropriate filters
         for pipeline_id in pipeline_ids:
+            # initialize a real dict for query filters per pipeline
+            query_filters: Dict[str, Any] = {}
+            query_filters["pipeline_id"] = pipeline_id
+            if filters:
+                query_filters.update(filters)
+
             page = 1
             while True:
                 response = self.fetch_cards(
                     limit=limit,
                     page=page,
                     include=include,
-                    filters={"pipeline_id": pipeline_id}
+                    filters=query_filters
                 )
 
                 if response.get("error"):

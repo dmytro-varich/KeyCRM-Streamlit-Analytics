@@ -90,9 +90,13 @@ def main() -> None:
             status.update(label="📦 Завантаження карток...", state="running")
 
             # Fetch all cards for all pipelines
+            today_date = get_today_date_kyiv()
+            filters = {}
+            filters['updated_between'] = f"{today_date} 00:00:00, {today_date} 23:59:59"
             all_cards = api_client.fetch_all_pipeline_cards(
                 pipeline_ids,
                 include="manager, custom_fields",
+                filters=filters
             ) or []
 
             # cards_from_n8n = get_n8n_webhook_data("WEBHOOK_PROD_URL") or []
