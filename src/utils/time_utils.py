@@ -3,10 +3,15 @@ from datetime import datetime, timezone
 
 SERVER_TZ = timezone.utc
 KYIV_TZ = pytz.timezone("Europe/Kyiv")
-utc_now = datetime.now(SERVER_TZ)
-now_kyiv = datetime.now(KYIV_TZ).isoformat()
-today = datetime.now(KYIV_TZ).strftime("%Y-%m-%d")
-today_date = datetime.strptime(today, "%Y-%m-%d").date()
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+def get_now_kyiv_iso() -> str:
+    return datetime.now(KYIV_TZ).isoformat()
+
+def get_today_date_kyiv():
+    return datetime.now(KYIV_TZ).date()
 
 def get_kyiv_date(created_at_str: str) -> str:
     try:

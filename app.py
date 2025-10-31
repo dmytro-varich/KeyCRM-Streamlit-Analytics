@@ -13,11 +13,12 @@ sys.path.insert(0, str(root_path))
 
 # Project-specific imports
 from src.api.client import ApiClient
-from config.settings import MONGODB_URI 
-from src.utils.time_utils import today_date, now_kyiv, utc_now
+from config.settings import MONGODB_URI, WEBHOOK_PROD_URL
 from src.utils.data_processing import process_all_data
+from src.services.n8n_service import get_n8n_webhook_data
 from src.db.db_utils import init_mongo_client, get_database, get_collection
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
+from src.utils.time_utils import get_utc_now, get_now_kyiv_iso, get_today_date_kyiv
 from src.components.tables import render_manager_tables, create_simple_dataframe, get_managers_excel_download
 
 # Initialize api_client 
@@ -77,7 +78,6 @@ def main() -> None:
         st.cache_data.clear()
         st.cache_resource.clear()
         st.session_state["loading"] = True
-        st.rerun()
     st.markdown("---")
 
     # If loading flag is set, show loading status and process data
@@ -93,7 +93,12 @@ def main() -> None:
             all_cards = api_client.fetch_all_pipeline_cards(
                 pipeline_ids,
                 include="manager, custom_fields",
-            )
+            ) or []
+
+            # cards_from_n8n = get_n8n_webhook_data("WEBHOOK_PROD_URL") or []
+            # if cards_from_n8n:
+            #     msg_placeholder.write(f"Отримано {len(cards_from_n8n)} карток з n8n вебхука.")
+            #     all_cards.extend(cards_from_n8n)
 
             if not all_cards:
                 status.update(label="⚠️ Не знайдено карток для аналізу.", state="error")
@@ -103,13 +108,19 @@ def main() -> None:
                 status.update(label="🧮 Обробка даних...", state="running")
 
                 # Process all data and store results in session state
-                filtered_all_cards, manager_dict = process_all_data(api_client, all_cards, base_cards)
+                filtered_all_cards, manager_dict, calls_total = process_all_data(api_client, all_cards, base_cards)
+                
+                now_kyiv = get_now_kyiv_iso()
+                created_at = get_utc_now()   
+                today_date = get_today_date_kyiv()
+
                 result = {
                     "timestamp": now_kyiv,
-                    "createdAt": utc_now,
+                    "createdAt": created_at,
                     "cards": filtered_all_cards,
                     "analytics": manager_dict,
-                    "count": len(filtered_all_cards)
+                    "count": len(filtered_all_cards), 
+                    "calls_total": calls_total
                 }
 
                 analytics_collection = get_collection(db, "analytics_results")
@@ -135,11 +146,14 @@ def main() -> None:
                 cards = api_client.fetch_all_pipeline_cards(pipeline_ids, include="manager,custom_fields")
                 cards = cards or []
                 cards = [card for card in cards if not card.get("is_finished", False)]
-                
+                now_kyiv = get_now_kyiv_iso()
+                created_at = get_utc_now()   
+                today_date = get_today_date_kyiv()
+
                 snapshot_data = {
                     "timestamp": now_kyiv,           # Human-readable Kyiv time
                     "date": str(today_date),         # Date as string (Kyiv)
-                    "createdAt": utc_now,            # For MongoDB TTL index (must be datetime object)
+                    "createdAt": created_at,         # For MongoDB TTL index (must be datetime object)
                     "cards": cards,
                     "count": len(cards)
                 }
@@ -163,13 +177,14 @@ def display_results() -> None:
             return
 
         analytics_data = latest_result.get("analytics")
+        calls_total =  latest_result.get("calls_total")
         if not analytics_data:
             st.warning("⚠️ Немає даних аналітики для завантаження або відображення.")
             return
-
+        today_date = get_today_date_kyiv()
         st.header(f"📑 Аналітика менеджерів ({today_date})")
         # Button to download an excel file with all manager tables
-        excel_buffer = get_managers_excel_download(analytics_data)
+        excel_buffer = get_managers_excel_download(analytics_data, calls_total)
         if excel_buffer:
             st.download_button(
                 label="⬇️ Завантажити всі таблиці",
@@ -181,7 +196,7 @@ def display_results() -> None:
             st.info("ℹ️ Немає файлу для завантаження.")
 
         # Render manager analytics tables
-        render_manager_tables(analytics_data)
+        render_manager_tables(analytics_data, calls_total)
 
         # Show all cards in an expandable dataframe
         with st.expander("📋 Усі картки"):

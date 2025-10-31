@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from src.utils.analytics import init_category, get_custom_field, define_pipeline
 
 
-def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
+def render_manager_tables(manager_dict: Dict[str, Any], calls_total: Dict[str, int]) -> None:
     """
     Displays analytics as HTML tables with a grouped column "Closed from them".
     """
@@ -72,65 +72,16 @@ def render_manager_tables(manager_dict: Dict[str, Any]) -> None:
         html += f"<td>{total['Планування (пообіцяв)']}</td>"
         html += "</tr>"
 
-        # --- Row "Всього дозвонів за день" ---
-        total_calls_new = 0
-        total_calls_prev = 0
-        for category in default_categories:
-            stats = categories.get(category, init_category())
-            if category in ['База']:
-                total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
-                total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
-            if category in ['Суміжні', 'Алмази', 'Діаманти']:
-                total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
-
         html += "<tr style='font-weight:bold;'>"
         html += "<td>Всього дозвонів за день</td>"
-        html += f"<td colspan='11'>{total_calls_new + total_calls_prev}</td>"
+        html += f"<td colspan='11'>{calls_total.get(manager, 0)}</td>"
         html += "</tr>"
         html += "</table>"
 
         st.markdown(html, unsafe_allow_html=True)
 
 
-def create_simple_dataframe(cards: Dict[str, List[Dict[str, Any]]]) -> pd.DataFrame:
-    """
-    Create a combined DataFrame from {"Нові": [...], "Попередні": [...]}.
-    """
-    rows: List[Dict[str, Any]] = []
-
-    for state, card_list in cards.items():
-        for card in card_list:
-            created = (card.get("created_at") or "")[:10]
-            updated = (card.get("updated_at") or "")[:10]
-            pipeline_id = card.get("pipeline_id")
-            if pipeline_id is None:
-                pipeline_label = "N/A"
-            else:
-                try:
-                    pipeline_label = define_pipeline(int(pipeline_id))
-                except (TypeError, ValueError):
-                    pipeline_label = "N/A"
-
-            row = {
-                "Тип": state,
-                "ID": card.get("id"),
-                "Назва": card.get("title"),
-                "Воронка": pipeline_label or "N/A",
-                "Менеджер": card.get("manager", {}).get("full_name", "N/A"),
-                "Прогрітий (готовий працювати)": get_custom_field(card, "ПРОГРІТИЙ (готовий працювати)"),
-                "Закр. Зустріч КИЇВ": get_custom_field(card, "Закр. Зустріч КИЇВ"),
-                "Закр. Зустріч ONLINE": get_custom_field(card, "Закр. Зустріч ONLINE"),
-                "Закр. Навчання В ЗАПИСІ": get_custom_field(card, "Закр. Навчання В ЗАПИСІ"),
-                "Кваліфікований повністю": get_custom_field(card, "Кваліфікований повністю"),
-                "Створено": created,
-                "Оновлено": updated,
-            }
-            rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
-def get_managers_excel_download(manager_dict: dict) -> BytesIO:
+def get_managers_excel_download(manager_dict: dict, calls_total: dict) -> BytesIO:
     """
     Creates an Excel file with tables for all managers (each on a separate sheet).
     Returns BytesIO for transfer to st.download_button.
@@ -178,17 +129,6 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
                 "Планування (пообіцяв)": total['Планування (пообіцяв)'],
             })
 
-            # Row "Всього дозвонів за день"
-            total_calls_new = 0
-            total_calls_prev = 0
-            for category in default_categories:
-                stats = categories.get(category, init_category())
-                if category in ['База']:
-                    total_calls_new += stats['Нові']['Прогріті'] + stats['Нові']['Не прогріті']
-                    total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
-                if category in ['Суміжні', 'Алмази', 'Діаманти']:
-                    total_calls_prev += stats['Попередні']['Прогріті'] + stats['Попередні']['Не прогріті']
-
             export_rows.append({
                 "Категорія": "Всього дозвонів за день",
                 "Нові - Прогріті": "",
@@ -200,7 +140,7 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
                 "Зустріч": "",
                 "Навчання": "",
                 "Планування (надіслав)": "", 
-                "Планування (пообіцяв)": total_calls_new + total_calls_prev,
+                "Планування (пообіцяв)": calls_total.get(manager, 0),
             })
 
             df = pd.DataFrame(export_rows)
@@ -209,3 +149,41 @@ def get_managers_excel_download(manager_dict: dict) -> BytesIO:
             df.to_excel(writer, index=False, sheet_name=sheet_name)
     excel_buffer.seek(0)
     return excel_buffer
+
+
+def create_simple_dataframe(cards: Dict[str, List[Dict[str, Any]]]) -> pd.DataFrame:
+    """
+    Create a combined DataFrame from {"Нові": [...], "Попередні": [...]}.
+    """
+    rows: List[Dict[str, Any]] = []
+
+    for state, card_list in cards.items():
+        for card in card_list:
+            created = (card.get("created_at") or "")[:10]
+            updated = (card.get("updated_at") or "")[:10]
+            pipeline_id = card.get("pipeline_id")
+            if pipeline_id is None:
+                pipeline_label = "N/A"
+            else:
+                try:
+                    pipeline_label = define_pipeline(int(pipeline_id))
+                except (TypeError, ValueError):
+                    pipeline_label = "N/A"
+
+            row = {
+                "Тип": state,
+                "ID": card.get("id"),
+                "Назва": card.get("title"),
+                "Воронка": pipeline_label or "N/A",
+                "Менеджер": card.get("manager", {}).get("full_name", "N/A"),
+                "Прогрітий (готовий працювати)": get_custom_field(card, "ПРОГРІТИЙ (готовий працювати)"),
+                "Закр. Зустріч КИЇВ": get_custom_field(card, "Закр. Зустріч КИЇВ"),
+                "Закр. Зустріч ONLINE": get_custom_field(card, "Закр. Зустріч ONLINE"),
+                "Закр. Навчання В ЗАПИСІ": get_custom_field(card, "Закр. Навчання В ЗАПИСІ"),
+                "Кваліфікований повністю": get_custom_field(card, "Кваліфікований повністю"),
+                "Створено": created,
+                "Оновлено": updated,
+            }
+            rows.append(row)
+
+    return pd.DataFrame(rows)

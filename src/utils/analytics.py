@@ -1,4 +1,6 @@
 from typing import List, Dict, Any, Optional
+from config.settings import not_qualified_status_ids, plan_sent_status_ids, plan_promised_status_ids, hot_contacts_status_ids
+
 
 def define_pipeline(pipeline_id: int) -> Optional[str]:
     """
@@ -80,19 +82,13 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
     cards = {"Нові": [...], "Попередні": [...]}
     """
     result: Dict[str, Any] = {}
-
     meeting_fields = {"Закр. Зустріч КИЇВ", "Закр. Зустріч ONLINE"}
     training_field = "Закр. Навчання В ЗАПИСІ"
-    not_qualified_status_ids = {326, 341, 386, 396, 435, 425, 534, 524, 361, 450, 411, 626, 548, 642, 616}
-    plan_sent_status_ids = {365, 414, 452, 823, 646}
-    plan_promised_status_ids = {364, 802, 812, 822, 911}
-    hot_contacts_status_ids = {344, 398, 437, 536, 629, 363, 413, 451, 821, 644, 867, 477}
 
     for state, card_list in cards.items():
         for card in card_list:
             manager = card.get("manager", {})
-            manager_key = f"{manager.get('first_name', 'N/A')} {manager.get('last_name', 'N/A')}".strip()
-
+            manager_key = manager.get("full_name", "N/A")
             status_id = card.get("status_id")
 
             pipeline_id = card.get("pipeline_id")
