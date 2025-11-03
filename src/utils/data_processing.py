@@ -2,9 +2,9 @@ import streamlit as st
 from copy import deepcopy
 from collections import defaultdict
 from typing import List, Dict, Tuple, Any
-from src.utils.time_utils import get_kyiv_date, get_today_date_kyiv
 from src.utils.analytics import build_manager_category_dict
-from config.settings import plan_sent_status_ids, plan_promised_status_ids
+from src.utils.time_utils import get_kyiv_date, get_today_date_kyiv
+from config.settings import plan_sent_status_ids, plan_promised_status_ids, hot_contacts_status_ids
 
 
 def _merge_values(a: Any, b: Any) -> Any:
@@ -48,6 +48,19 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
     Processes all cards and classifies them as New or Previous
     for 'Base' (not Diamonds) and 'Target' (Diamonds, Diamenty, Sumizhnyky).
     """
+    # --- Identify warmed up base cards ---
+    warmed_up_base_ids = set()
+    for card in base_cards:
+        if card.get("manager_id") is not None and not card.get("is_finished", False):
+            custom_fields = card.get("custom_fields", [])
+            hot_contact = False
+            for field in custom_fields:
+                if field.get("name") == "ПРОГРІТИЙ (готовий працювати)" and field.get("value"):
+                    hot_contact = True
+                    break
+            status_id = card.get("status_id")
+            if hot_contact or (status_id in hot_contacts_status_ids):
+                warmed_up_base_ids.add(card["id"])
 
     # --- Get previous state ---
     prev_cards_by_id = {
@@ -101,9 +114,6 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
             manager_key = manager_id_key_map.get(manager_id)
             if manager_key is None:
                 continue
-
-        # if card['title'] and card['title'] == 'test999':
-        #     st.json(card)
 
         card_created_kyiv = get_kyiv_date(card.get("created_at", ""))
         card_updated_kyiv = get_kyiv_date(card.get("updated_at", ""))
@@ -159,11 +169,6 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
                 and manager_id is not None
             ): 
                 manager_key = manager_id_key_map.get(manager_id) or f"ID:{manager_id}"
-                # Ensure manager dict exists before writing full_name
-                # if not isinstance(card.get("manager"), dict):
-                #     card["manager"] = {"full_name": manager_key}
-                # else:
-                #     card["manager"]["full_name"] = manager_key
                 previous_cards_no_calls.append(card)
                 
         # --- If the card is new (was not in previous_hidden_cards) ---
@@ -191,6 +196,6 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
         "Попередні": previous_cards + previous_cards_no_calls
     }
 
-    manager_dict = build_manager_category_dict(filtered_all_cards)
+    manager_dict = build_manager_category_dict(filtered_all_cards, warmed_up_base_ids)
 
     return (filtered_all_cards, manager_dict, calls_total)

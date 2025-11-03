@@ -76,7 +76,7 @@ def init_category() -> Dict[str, Any]:
     }
 
 
-def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
+def build_manager_category_dict(cards: Dict[str, List[Dict]], warmed_up_base_ids: set) -> Dict[str, Any]:
     """
     Builds analytics by managers and funnel categories.
     cards = {"Нові": [...], "Попередні": [...]}
@@ -122,7 +122,12 @@ def build_manager_category_dict(cards: Dict[str, List[Dict]]) -> Dict[str, Any]:
                 elif name == training_field:
                     training = bool(value)
 
-            prog_state = "Прогріті" if hot_contact or status_id in hot_contacts_status_ids else "Не прогріті"
+            if state == 'Попередні':
+                if card["id"] in warmed_up_base_ids:
+                    continue
+                prog_state = "Прогріті" if (hot_contact or status_id in hot_contacts_status_ids) else "Не прогріті"
+            else:
+                prog_state = "Прогріті" if (hot_contact or status_id in hot_contacts_status_ids) else "Не прогріті"
 
             # --- initialization of nested structures ---
             if manager_key not in result:
