@@ -43,7 +43,7 @@ def merge_manager_dicts(*dicts: Dict[str, Any]) -> Dict[str, Any]:
     return merged
 
 
-def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: List[Dict[str, Any]]) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any], Dict[str, int]]:
+def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: List[Dict[str, Any]]) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any], Dict[str, int], Dict[str, List[Dict[str, int]]]]:
     """
     Processes all cards and classifies them as New or Previous
     for 'Base' (not Diamonds) and 'Target' (Diamonds, Diamenty, Sumizhnyky).
@@ -61,7 +61,7 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
             status_id = card.get("status_id")
             if hot_contact or (status_id in hot_contacts_status_ids):
                 warmed_up_base_ids.add(card["id"])
-
+    
     # --- Get previous state ---
     prev_cards_by_id = {
         card["id"]: card for card in base_cards if not card.get("is_finished", False)
@@ -71,7 +71,28 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
 
     # --- Get today's calls ---
     today_date = get_today_date_kyiv()
-    calls_today = api_client.fetch_all_calls(max_calls=400, date=today_date, include="")
+    calls_today = api_client.fetch_all_calls(max_calls=400, date=today_date, include="manager")
+
+    calls_mgr_stats = {}
+    for call in calls_today:
+        manager = call.get('manager')
+        manager_name = manager.get('full_name') if isinstance(manager, dict) else None
+        ext_number = call.get("external_number", None)
+        duration_sec = call.get("duration", None)
+        if (
+            manager
+            and ext_number
+            and duration_sec is not None
+            and manager.get('id', None)
+            and get_kyiv_date(call.get("created_at")) == str(today_date)
+            and call.get("state") == "completed"
+        ):
+            if manager_name not in calls_mgr_stats:
+                calls_mgr_stats[manager_name] = []
+            calls_mgr_stats[manager_name].append({
+                "external_number": ext_number,
+                "duration": duration_sec
+            })
 
     called_card_ids = {
         call["lead_id"]
@@ -198,4 +219,4 @@ def process_all_data(api_client, all_cards: List[Dict[str, Any]], base_cards: Li
 
     manager_dict = build_manager_category_dict(filtered_all_cards, warmed_up_base_ids)
 
-    return (filtered_all_cards, manager_dict, calls_total)
+    return (filtered_all_cards, manager_dict, calls_total, calls_mgr_stats)

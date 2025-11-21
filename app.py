@@ -3,8 +3,10 @@
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, List, Any
 
 # Third-party imports
+import pandas as pd
 import streamlit as st
 
 # Add parent directory to sys.path for module imports
@@ -13,13 +15,13 @@ sys.path.insert(0, str(root_path))
 
 # Project-specific imports
 from src.api.client import ApiClient
-from config.settings import MONGODB_URI, WEBHOOK_PROD_URL
+from src.components.tables import *
 from src.utils.data_processing import process_all_data
-from src.services.n8n_service import get_n8n_webhook_data
+from config.settings import MONGODB_URI, WEBHOOK_PROD_URL
 from src.db.db_utils import init_mongo_client, get_database, get_collection
 from src.components.texts import introduce_text, how_to_use_text, how_to_work_text
 from src.utils.time_utils import get_utc_now, get_now_kyiv_iso, get_today_date_kyiv
-from src.components.tables import render_manager_tables, create_simple_dataframe, get_managers_excel_download
+from src.db.manager_tables import save_all_managers_to_mongo, save_manager_data_to_mongo
 
 # Initialize api_client 
 api_client = ApiClient()
@@ -70,14 +72,37 @@ def main() -> None:
         st.warning("⚠️ Сьогоднішній знімок ще не створено.")
         base_cards = []
 
-    # Button to trigger analytics generation
-    if st.button("🔎 Переглянути аналітику", type="primary"):
-        for key in ["loading", "all_data"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.cache_data.clear()
-        st.cache_resource.clear()
-        st.session_state["loading"] = True
+    # Button to trigger analytics generation & Clear the data from tables
+    col1, col2, col3, col4, _ = st.columns([1, 1, 1, 1, 7])
+    with col1:
+        if st.button("🔎 Переглянути аналітику", type="primary"):
+            st.session_state["loading"] = True
+            st.cache_data.clear()
+            st.cache_resource.clear()
+    with col2:
+        if st.button("🧹 Очистити всі таблиці"):
+            for k in list(st.session_state.keys()):
+                if (
+                    isinstance(k, str)
+                    and (
+                        k.startswith("manager_table_")
+                        or k.startswith("manager_questions_")
+                        or k.startswith("manager_tables")
+                        or k.startswith("manager_questions")
+                    )
+                ):
+                    del st.session_state[k]
+    with col3:
+        if st.button("💾 Зберегти всі таблиці"):
+            pass
+            # manager_tables = st.session_state.get("manager_tables", {})
+            # manager_questions = st.session_state.get("manager_questions", {})
+            # save_all_managers_to_mongo(collection, manager_tables, manager_questions)
+            # st.success("Дані всіх менеджерів збережено в базі!")
+    with col4: 
+        if st.button("📥 Завантажити Excel"): 
+            pass
+
     st.markdown("---")
 
     # If loading flag is set, show loading status and process data
@@ -96,7 +121,7 @@ def main() -> None:
             all_cards = api_client.fetch_all_pipeline_cards(
                 pipeline_ids,
                 include="manager, custom_fields",
-                filters=filters
+                filters=filters   
             ) or []
 
             # cards_from_n8n = get_n8n_webhook_data("WEBHOOK_PROD_URL") or []
@@ -112,7 +137,7 @@ def main() -> None:
                 status.update(label="🧮 Обробка даних...", state="running")
 
                 # Process all data and store results in session state
-                filtered_all_cards, manager_dict, calls_total = process_all_data(api_client, all_cards, base_cards)
+                filtered_all_cards, manager_dict, calls_total, calls_mgr_stats = process_all_data(api_client, all_cards, base_cards)
                 
                 now_kyiv = get_now_kyiv_iso()
                 created_at = get_utc_now()   
@@ -124,7 +149,8 @@ def main() -> None:
                     "cards": filtered_all_cards,
                     "analytics": manager_dict,
                     "count": len(filtered_all_cards), 
-                    "calls_total": calls_total
+                    "calls_total": calls_total, 
+                    "calls_mgr_stats": calls_mgr_stats
                 }
 
                 # analytics_collection = get_collection(db, "analytics_results")
@@ -175,34 +201,145 @@ def display_results() -> None:
     """
     if "all_data" in st.session_state and st.session_state["all_data"]:
         all_data = st.session_state["all_data"]
-
         analytics_data = all_data.get("analytics")
         calls_total = all_data.get("calls_total")
+        calls_mgr_stats = all_data.get("calls_mgr_stats")
         if not analytics_data:
             st.warning("⚠️ Немає даних аналітики для завантаження або відображення.")
             return
         today_date = get_today_date_kyiv()
         st.header(f"📑 Аналітика менеджерів ({today_date})")
+        
         # Button to download an excel file with all manager tables
-        excel_buffer = get_managers_excel_download(analytics_data, calls_total)
-        if excel_buffer:
-            st.download_button(
-                label="⬇️ Завантажити всі таблиці",
-                data=excel_buffer,
-                file_name=f"keycrm_analytics_all_managers_{today_date}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        managers = sorted(analytics_data.keys())
+        if not managers:
+            st.info("⚠️ Немає даних по менеджерам для відображення.")
         else:
-            st.info("ℹ️ Немає файлу для завантаження.")
+            mgr_collection = get_collection(db, 'manager_tables')
+            tabs = st.tabs(managers)
+            for tab, mgr in zip(tabs, managers):
+                with tab:
+                    # Prepare single-manager structures expected by render/get_excel
+                    mgr_analytics = {mgr: analytics_data[mgr]}
+                    mgr_calls_total = {mgr: calls_total.get(mgr, 0) if calls_total else 0}
 
-        # Render manager analytics tables
-        render_manager_tables(analytics_data, calls_total)
+                    # Render the manager's analytics table(s)
+                    render_manager_tables(mgr_analytics, mgr_calls_total)
 
-        # Show all cards in an expandable dataframe
-        with st.expander("📋 Усі картки"):
-            df_cards = create_simple_dataframe(all_data.get("cards", []))
-            st.dataframe(df_cards, width="stretch")
+                    # -------------------------------
+                    # 📋 Section: Manager's Cards
+                    # -------------------------------
+                    raw_cards = all_data.get("cards", [])
+
+                    def _get_manager_full_name(card: Any) -> Any:
+                        if not isinstance(card, dict):
+                            return None
+                        m = card.get("manager")
+                        if isinstance(m, dict):
+                            return m.get("full_name")
+                        return m
+
+                    manager_cards_by_state: Dict[str, List[Dict[str, Any]]] = {}
+
+                    # If cards stored as dict(state -> list), preserve states
+                    if isinstance(raw_cards, dict):
+                        for state_key, lst in raw_cards.items():
+                            if not isinstance(lst, list):
+                                continue
+                            for c in lst:
+                                if _get_manager_full_name(c) == mgr:
+                                    manager_cards_by_state.setdefault(state_key, []).append(c)
+                    elif isinstance(raw_cards, list):
+                        # fallback: no state info, put everything to "Усі"
+                        for c in raw_cards:
+                            if _get_manager_full_name(c) == mgr:
+                                manager_cards_by_state.setdefault("Усі", []).append(c)
+
+                    if manager_cards_by_state:
+                        total = sum(len(v) for v in manager_cards_by_state.values())
+                        with st.expander(f"💳 Картки менеджера — {mgr} ({total})"):
+                            df_cards = create_simple_dataframe(manager_cards_by_state)
+                            st.dataframe(df_cards, width="stretch")
+
+                    if calls_mgr_stats and calls_mgr_stats.get(mgr):
+                        st.subheader("☎️ Статистика дзвінків")
+                        render_manager_calls_stats(mgr, calls_mgr_stats)
+                        render_manager_calls_details({mgr: calls_mgr_stats[mgr]})
+
+                    # Retrieve saved manager tables from the session
+                    manager_saved_tables = get_tables_from_session('manager_tables').get(mgr)
+
+                    st.markdown('---')
+                    st.markdown("> В наступному оновленні: редагуючі таблиці.")
+                    # if st.button(f"💾 Зберегти", key=f"save_{mgr}"):
+                    #     try:
+                    #         manager_tables = {}
+                    #         manager_questions = {}
+
+                    #         diamonds_key = f"manager_table_{mgr.replace(' ', '_')}_diamonds"
+                    #         if diamonds_key in st.session_state:
+                    #             data = st.session_state[diamonds_key]
+
+                    #             # ✅ Если это DataFrame — просто конвертируем
+                    #             if isinstance(data, pd.DataFrame):
+                    #                 manager_tables["diamonds"] = data.to_dict(orient="records")
+
+                    #             # ✅ Если это структура Streamlit редактора
+                    #             elif isinstance(data, dict) and set(data.keys()) >= {"edited_rows", "added_rows", "deleted_rows"}:
+                    #                 # Преобразуем все изменения в единый список
+                    #                 rows = []
+                    #                 # Извлекаем edited_rows
+                    #                 for _, v in data.get("edited_rows", {}).items():
+                    #                     rows.append(v)
+                    #                 # Добавляем added_rows
+                    #                 rows.extend(data.get("added_rows", []))
+                    #                 manager_tables["diamonds"] = rows
+
+                    #             # ✅ Если это уже list of dict
+                    #             elif isinstance(data, list):
+                    #                 manager_tables["diamonds"] = data
+
+                    #             else:
+                    #                 manager_tables["diamonds"] = []
+
+                    #         save_manager_data_to_mongo(mgr_collection, mgr, manager_tables, manager_questions)
+                    #         st.success(f"✅ Дані для {mgr} успішно збережено!")
+
+                    #     except Exception as e:
+                    #         st.error(f"🚫 Помилка при збереженні: {e}")
+                    # # -------------------------------
+                    # # 💎 Section: New Diamonds
+                    # # -------------------------------
+                    # diamonds_columns = [
+                    #     "Опис (місто, вид діяльності)", 
+                    #     "URL на лід", 
+                    #     "Який наступний крок", 
+                    #     "Які складнощі виникли", 
+                    #     "Яка допомога треба", 
+                    #     "Хто може допомогти", 
+                    #     "Коментар"
+                    # ]
+                    
+                    # diamonds_key = f"manager_table_{mgr.replace(' ', '_')}_diamonds"
+
+                    # if manager_saved_tables and "diamonds" in manager_saved_tables:
+                    #     initial_df = pd.DataFrame(manager_saved_tables["diamonds"])
+                    # else:
+                    #     initial_df = default_table_template(rows=5, columns=diamonds_columns)
+
+                    # # Инициализация таблицы (один раз)
+                    # init_manager_table(diamonds_key, initial_df)
+
+                    # st.subheader("💎 Нові Діаманти")
+                    # diamonds_edited_df = render_editable_manager_table(
+                    #     mgr,
+                    #     key_suffix="_diamonds",
+                    #     initial_df=initial_df
+                    # )
 
 
+                    
+
+                    
 if __name__ == "__main__":
     main()

@@ -20,3 +20,14 @@ def get_kyiv_date(created_at_str: str) -> str:
         return dt_kyiv.strftime("%Y-%m-%d")
     except Exception:
         return ""
+
+def format_duration(total_seconds: int) -> str:
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        if hours > 0:
+            return f"{hours} год {minutes} хв {seconds} сек"
+        elif minutes > 0:
+            return f"{minutes} хв {seconds} сек"
+        else:
+            return f"{seconds} сек"
